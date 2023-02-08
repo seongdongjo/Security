@@ -1,0 +1,31 @@
+#)클릭제킹 : 사용자의 클릭이 의도하지 않은 화면을 클릭하게 해서 사용자의 의도와 다른 이벤트를 발생
+- 예를들어 광고레이어를 투명하게 만들어서 안보이게하고 클릭하면 광고페이지로 이동
+//web.xml에 추가해서 해결
+<filter>
+        <filter-name>httpHeaderSecurity</filter-name>
+        <filter-class>org.apache.catalina.filters.HttpHeaderSecurityFilter</filter-class>
+        <init-param>
+            <param-name>antiClickJackingOption</param-name>
+            <param-value>SAMEORIGIN</param-value>
+        </init-param>
+    </filter>
+-------------
+#)CSRF 공격(Cross Site Request Forgery)은 인터넷사용자(희생자!!)가 자신의 의지와는 무관하게 공격자가 의도한대로(수정,삭제 등) 특정 웹사이트에
+요청하게 만드는 공격이다. 즉, CSRF를 통해 해커는 희생자의 권한을 도용하여 중요 기능을 실행하는 것이 가능하다.
+CSRF는 해커가 사용자의 컴퓨터를 감염시키거나 페이스북 서버를 해킹을 해서 이뤄지는 공격이 아니다.
+
+-------------
+#)Application error disclosure(탐지된 오류 노출)
+400(Bad Request), 401(Authorization Required), 403(Forbidden), 404(Not Found), 500(Internal Server Error) 등과 같이
+웹 서버에서 오류가 발생할 경우 이에 대한 상세한 정보가 노출되는 경우에 탐지된다.
+
+웹 브라우저에 에러페이지 뜨면서 톰캣버전, stacktrace를 통해 서비스의 내부 구조를 파악할 수 있다.
+
+-------------
+#)Directory Browsing(디렉토리 나열) 취약점
+직접적인 공격 방법은 아니나 디렉토리 내의 파일목록을 노출시킴으로써 서비스 운영자가 노출을 원하지 않았던
+파일들이 노출되고 서비스 구조파악에 도움을 줌으로써 공격에 도움이 될 수 있다.
+디렉토리 나열 취약점으로 탐지된 URL을 웹 브라우저로 접속을 하면 디렉토리 구조가 보인다.
+
+
+
