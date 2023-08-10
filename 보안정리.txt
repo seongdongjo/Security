@@ -319,15 +319,116 @@ Vary: Accept-Encoding,User-Agent↳
 ↳
 <html>...</html>
 
-입력값으로 개행문자를 포함한 입력을 전달하는 경우 ...?cookie=abcd↳↳<script>...</script>↳HTTP/1.1 200 OK
+입력값으로 개행문자를 포함한 입력을 전달하는 경우 ...?cookie=abcd↳↳<script>...</script>↳HTTP/1.1 200 OK //개행문자가 2개연속으로되야 헤더가 끝났다고 한다.
 HTTP/1.1 200 OK↳						⇐ 원래 응답
 Server: NWS↳
 Date: Wed, 09 Aug 2023 07:33:55 GMT↳
 Content-Type: text/html↳
-Set-Cookie: mycookie=abcd↳↳<script>...</script>↳HTTP/1.1 200 OK↳	⇐ 파라미터로 전달된 코드에 의해서 만들어진 응답
+Set-Cookie: mycookie=abcd↳↳<script>...</script>↳HTTP/1.1 200 OK↳	⇐ 파라미터로 전달된 코드에 의해서 만들어진 응답(새로운 응답이 생김)
 Vary: Accept-Encoding,User-Agent↳
 ↳
 <html>...</html>
+
+------------------------------------------------------------------
+#)위의 방식은 HTTP응답 구조를 이용한 공격이라면
+#)HTTP요청 구조를 이용한 공격 -> 개행문자가 2개연속으로 나와야 헤더가 끊나는데 연결을 끊지않을려고 2개연속으로 쓰지않고 계속 하나씩 던짐(커넥션을 계속 물고있음)
+
+-------------------------------------------------------------------
+#) POST방식은 요청본문에 값을 넣는반면 GET방식은 값이 보인다. 근데 큰차이는 없다. 도구를 이용하면 결국보인다.
+   Content-type=url-encoding은 요청본문이 어떤방식으로 인코딩됬는지 나타낸다. -> key=value&key=value 이런식으로 해준다. (하나의문자열로)
+   form-data도 Post방식인데 이거는 하나의 문자열로 나타내기에는 가변적인 내용이라서 단락으로 나눠서 보낸다. boundary라는 키워드를 자동으로 생성해준다.
+   boundary로 구분한다. 이렇게 파트별로 나눠저있는데 multipart-form-data 이다.
+
+----webkitFormBoundary~
+
+----webkitFormBoundary~ 이런식으로
+
+
+#) 또 본문이 어디서 어디까지인지 Content-Length 로 요청본문이 다 왔다고 판단.
+#) 공격기법이 content-length를 크게잡고 1byte씩 계속 던진다.
+--------------------------------------------------------------------------
+#) Options라고요청을하면 서버가 헤더의 allow에다가  -> 메서드 목록을 보여준다.(그래서 Options를 보여주면 안된다)
+#) HEAD로 요청을하면 응답이 헤더만 오는것이다. (해당하는 서버가 어떠한 리소스가 있는지 스캐닝을한다. 본문까지 받을 필요없으니까, 리소스가 있는지는 200ok로 본다. -> 비활성해야 좋다
+#) PUT은 자원생성요청 -> 요청본문에 작성해서 -> 201created로 응답이온다. 200ok로 오는경우도있다.
+#) PUT,DELETE가 될려면 권한이 있어야한다.
+
+------------------------------------------------------------------------------
+#) http://www.example.com:80/path/myfile.html?key1=value#mark   //#은 프래그먼트 라고한다. 클라이언트에서만 사용, 서버에 전달되지는 않는다.(책갈피개념, 페이지 내에서 클릭하면 페이지내 해당위치로이동)
+------------------------------------------------------------------------------
+#) Redirection은 url 재요청이기때문에 제한을 둬야한다. (화이트리스트쓰는게 좋다)
+String url = request.getParameter("url");		⇐ 외부 입력값을 검증, 제한하지 않고 리다이렉트 주소로 사용
+							   ⇒ 의도하지 않은 주소로 이동 ⇒ 피싱 공격에 이용	
+response.sendRedirect(url);				⇐ Java에서 리다이렉트를 구현
+
+
+정상적인 처리 
+http://www.test.com/changePage.do?url=main.do
+→ 사용자에게 http://www.test.com/main.do 처리 결과가 전달
+
+비정상적인 처리 
+http://www.test.com/changePage.do?url=http://www.hack.com/main.do
+→ 사용자에게 http://www.hack.com/main.do 처리 결과가 전달
+==================================================================================
+#)쿠키는 서버와 클라이언트간의 식별을 위해(상태 기반의 정보를 기억하도록 하는것 원래,HTTP는 stateless니까)
+응답헤더에 서버가 response로 준다. set-cookie
+
+#)보안쿠키 : https통신할때만 전달
+set-cookie: id=seong; Expires=wed; secure
+
+#)HttpOnly : 스크립트에서 쿠키로 접근하는걸 막을 수 있다. Document.cookie API에 접근차단.
+  set-cookie: id=seong; Expires=wed; secure; HttpOnly
+
+-----------------------------------------------
+#)세션 -> 세션이 있는거처럼 만들어주는거임. (세션이 나오기전에는 쿠키에다가 사용자정보를 저장했는데 이러면 클라이언트측에서 위변조, 스니핑할수있다)
+서버가 ID를 발급해서 SessionId를 준다. 쿠키로 -> 문제는 이거도 쿠키로 왔다갔다하는데 이거도 리스크가 있긴하다.
+
+#)세션 단점이 서버가 다르면 세션이 다르다(다른서버끼리 세션을 공유못한다), 그래서 JWT라는 토큰을 이용한다. -> 토큰을 한서버에서 발급받으면 다른서버에서 검증을한다.
+(버스토큰처럼 버스토큰만 맞으면 어느 버스에서도 탈수있다, 토큰의 내용이 JSON형태로 되어있다.) 즉, 마이크로서비스로 점차 바뀌고있어서 JWT로 바뀌고있다.
+
+#)프록시에서 모니터링(클라이언트요청을 대신받아서 서버에 전달) 및 캐싱가능 -> 이게 하나의 피시에 들어가면 로컬프록시가된다.(BurpSuite) 
+
+
+
+GET /WebGoat/ HTTP/1.1
+Host: localhost:7070
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/116.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3
+Accept-Encoding: gzip, deflate
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Authorization: Basic d2ViZ29hdDp3ZWJnb2F0   //이 인증방법은 올바르지않다. -> 디코딩하면 webgoat:webgoat 이렇게 다나온다.
+
+------------------------------------------------
+#)쓰레드는 동기화오류가 중요하다(100원을 먼저입금했는데 200원입금이 먼저처리되는 현상). 이걸막기위해서 동기화처리(순서대로) -> 번호표뽑아서 띵동되면 가는것. -> 문제점은 대기시간이 걸릴수가있다.
+그래서 중요한것이 동기화처리범위이다. 은행들어갈때부터 공유자원차지하면(교착상태) 안되니까 띵동할때만 가는것으로 해야한다.
+
+- 싱글톤으로 존재하는 객체들의 멤버변수가 여러 스레드에 의해 공유되면서 다른 스레드에게 정보를 노출
+#) 파라미터 username을 전역변수에 저장한다고하면 -> 이걸쿼리로 만든다고 가정했을 때(1번 submit에서 username:jeff, 2번 submit에서 username: dave)-> 
+근데 또 누가 다른username으로 입력하면 전역변수가 바뀐다. dave로 바뀐다. 1번유저는 jeff로 입력했지만 dave로 나온다.
+
+#) <%! ~ %> 이거는 멤버필드(전역변수) -> 사용비추천
+   <% %> 이거는 메서드안에 변수선언
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
