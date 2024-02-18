@@ -1,0 +1,6 @@
+#)로보카피 사용법
+- 비어있는 디렉토리를 포함하여 디렉토리를 모두 복사한다.(/S 는 반대로 비어있는 디렉토리는 제외하고)
+ROBOCOPY C:\test D:\backup /E
+
+- 실행 시 상태를 로그파일에 저장
+ROBOCOPY X:\test C:\backup /E /LOG+"C:\LOG\robocopy.log"
